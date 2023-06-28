@@ -23,6 +23,11 @@ We currently use the presence of any of the following to determine if something 
  - `.svn`
 
 This should work on all supported Rust platforms, although the single-filesystem functionality only works
-on Unix-like platforms. It even works on WASI with [wasmtime](https://wasmtime.dev/), presuming you grant FS access! 
+on Unix-like platforms. It even works on WASI with [wasmtime](https://wasmtime.dev/), presuming you grant FS access!
 
 This work is licensed under the ISC license, a copy of which can be found at [LICENSE.txt](LICENSE.txt)
+
+Development
+===========
+
+This project uses [pre-commit](https://pre-commit.com/); please install it and set up the hooks with `pre-commit install`.
