@@ -1,6 +1,8 @@
 use anyhow::Context;
 use clap::{Parser, ValueEnum};
+#[cfg(unix)]
 use std::fs::metadata;
+#[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
@@ -13,6 +15,7 @@ enum Mode {
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    #[cfg(unix)]
     #[clap(
         short,
         long,
@@ -37,20 +40,31 @@ fn is_project_root<P: AsRef<Path>>(dir: &P) -> bool {
     INDICATORS.iter().any(|i| p.join(i).exists())
 }
 
+#[cfg(unix)]
+#[inline(always)]
+fn get_device(p: &Path) -> anyhow::Result<u64> {
+    Ok(metadata(p)?.dev())
+}
+
+#[cfg(not(unix))]
+#[inline(always)]
+fn get_device(_p: &Path) -> anyhow::Result<u64> {
+    Ok(0)
+}
+
 fn find_project_root(
     starting_directory: &Path,
     span_file_systems: bool,
     mode: Mode,
 ) -> anyhow::Result<Option<PathBuf>> {
-    let starting_device = metadata(starting_directory)
-        .context("could not stat starting directory")?
-        .dev();
+    let starting_device =
+        get_device(starting_directory).context("could not stat starting directory")?;
 
     let mut last_candidate: Option<PathBuf> = None;
 
     for path in starting_directory.ancestors() {
         if !span_file_systems
-            && metadata(path).context("could not stat ancestor")?.dev() != starting_device
+            && get_device(path).context("could not stat ancestor")? != starting_device
         {
             if let Some(path) = last_candidate {
                 return Ok(Some(path));
@@ -76,13 +90,20 @@ fn find_project_root(
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let starting_directory = std::fs::canonicalize(
-        args.workdir
-            .unwrap_or(std::env::current_dir().context("could not determine cwd")?),
-    )
-    .context("could not canonicalize path")?;
+    let starting_directory = args
+        .workdir
+        .unwrap_or(std::env::current_dir().context("could not determine cwd")?);
 
-    if let Some(path) = find_project_root(&starting_directory, args.span_file_systems, args.mode)? {
+    #[cfg(not(target_arch = "wasm32"))]
+    let starting_directory =
+        std::fs::canonicalize(starting_directory).context("could not canonicalize path")?;
+
+    #[cfg(unix)]
+    let span_file_systems = args.span_file_systems;
+    #[cfg(not(unix))]
+    let span_file_systems = true;
+
+    if let Some(path) = find_project_root(&starting_directory, span_file_systems, args.mode)? {
         println!("{}", path.as_os_str().to_string_lossy());
         Ok(())
     } else {

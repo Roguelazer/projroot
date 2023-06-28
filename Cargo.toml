@@ -3,8 +3,8 @@ name = "projroot"
 version = "0.1.0"
 edition = "2021"
 authors = ["James Brown <roguelazer@roguelazer.com>"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "ISC"
+description = "Small tool to guess the root directory of the project containing the current working directory"
 
 [dependencies]
 anyhow = "1.0.71"
