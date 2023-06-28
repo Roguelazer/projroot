@@ -98,24 +98,26 @@ mod tests {
     use super::{find_project_root, is_project_root, Mode};
 
     #[test]
-    fn test_is_project_root_git() {
-        let t = tempdir::TempDir::new("test_is_project_root").unwrap();
+    fn test_is_project_root_git() -> anyhow::Result<()> {
+        let t = tempfile::tempdir()?;
         assert!(!is_project_root(&t.path()));
-        std::fs::create_dir(t.path().join(".git")).unwrap();
+        std::fs::create_dir(t.path().join(".git"))?;
         assert!(is_project_root(&t.path()));
+        Ok(())
     }
 
     #[test]
-    fn test_is_project_root_svn() {
-        let t = tempdir::TempDir::new("test_is_project_root").unwrap();
+    fn test_is_project_root_svn() -> anyhow::Result<()> {
+        let t = tempfile::tempdir()?;
         assert!(!is_project_root(&t.path()));
-        std::fs::create_dir(t.path().join(".svn")).unwrap();
+        std::fs::create_dir(t.path().join(".svn"))?;
         assert!(is_project_root(&t.path()));
+        Ok(())
     }
 
     #[test]
     fn test_find_project_root_mode() -> anyhow::Result<()> {
-        let t = tempdir::TempDir::new("test_is_project_root")?;
+        let t = tempfile::tempdir()?;
         std::fs::create_dir(t.path().join(".git"))?;
         std::fs::create_dir(t.path().join("foo"))?;
         std::fs::create_dir(t.path().join("foo").join("bar"))?;

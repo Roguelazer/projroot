@@ -11,4 +11,4 @@ anyhow = "1.0.71"
 clap = { version = "4.3.9", features = ["derive"] }
 
 [dev-dependencies]
-tempdir = "0.3.7"
+tempfile = "3"
