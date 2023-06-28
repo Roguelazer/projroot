@@ -4,7 +4,6 @@ use std::fs::metadata;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
-
 #[derive(ValueEnum, Debug, PartialEq, Eq, Clone, Copy)]
 enum Mode {
     Closest,
@@ -27,17 +26,10 @@ struct Args {
     )]
     workdir: Option<PathBuf>,
     #[clap(short, long, value_enum, default_value_t = Mode::Closest)]
-    mode: Mode
+    mode: Mode,
 }
 
-const INDICATORS : &[&str] = &[
-    ".git",
-    "_darcs",
-    ".hg",
-    ".bzr",
-    ".svn",
-    
-];
+const INDICATORS: &[&str] = &[".git", "_darcs", ".hg", ".bzr", ".svn"];
 
 fn is_project_root<P: AsRef<Path>>(dir: &P) -> bool {
     let p = dir.as_ref();
@@ -45,7 +37,11 @@ fn is_project_root<P: AsRef<Path>>(dir: &P) -> bool {
     INDICATORS.iter().any(|i| p.join(i).exists())
 }
 
-fn find_project_root(starting_directory: &Path, span_file_systems: bool, mode: Mode) -> anyhow::Result<Option<PathBuf>> {
+fn find_project_root(
+    starting_directory: &Path,
+    span_file_systems: bool,
+    mode: Mode,
+) -> anyhow::Result<Option<PathBuf>> {
     let starting_device = metadata(starting_directory)
         .context("could not stat starting directory")?
         .dev();
@@ -53,7 +49,9 @@ fn find_project_root(starting_directory: &Path, span_file_systems: bool, mode: M
     let mut last_candidate: Option<PathBuf> = None;
 
     for path in starting_directory.ancestors() {
-        if !span_file_systems && metadata(path).context("could not stat ancestor")?.dev() != starting_device {
+        if !span_file_systems
+            && metadata(path).context("could not stat ancestor")?.dev() != starting_device
+        {
             if let Some(path) = last_candidate {
                 return Ok(Some(path));
             } else {
@@ -78,22 +76,27 @@ fn find_project_root(starting_directory: &Path, span_file_systems: bool, mode: M
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let starting_directory = std::fs::canonicalize(args
-        .workdir
-        .unwrap_or(std::env::current_dir().context("could not determine cwd")?)).context("could not canonicalize path")?;
+    let starting_directory = std::fs::canonicalize(
+        args.workdir
+            .unwrap_or(std::env::current_dir().context("could not determine cwd")?),
+    )
+    .context("could not canonicalize path")?;
 
     if let Some(path) = find_project_root(&starting_directory, args.span_file_systems, args.mode)? {
         println!("{}", path.as_os_str().to_string_lossy());
         Ok(())
     } else {
-        anyhow::bail!("found no project root in ancestors of {}", starting_directory.as_os_str().to_string_lossy());
+        anyhow::bail!(
+            "found no project root in ancestors of {}",
+            starting_directory.as_os_str().to_string_lossy()
+        );
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{is_project_root, find_project_root, Mode};
-    
+    use super::{find_project_root, is_project_root, Mode};
+
     #[test]
     fn test_is_project_root_git() {
         let t = tempdir::TempDir::new("test_is_project_root").unwrap();
@@ -101,7 +104,7 @@ mod tests {
         std::fs::create_dir(t.path().join(".git")).unwrap();
         assert!(is_project_root(&t.path()));
     }
-    
+
     #[test]
     fn test_is_project_root_svn() {
         let t = tempdir::TempDir::new("test_is_project_root").unwrap();
@@ -111,7 +114,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_project_root_mode() -> anyhow::Result<()>{
+    fn test_find_project_root_mode() -> anyhow::Result<()> {
         let t = tempdir::TempDir::new("test_is_project_root")?;
         std::fs::create_dir(t.path().join(".git"))?;
         std::fs::create_dir(t.path().join("foo"))?;
