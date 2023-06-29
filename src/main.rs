@@ -1,10 +1,9 @@
 use anyhow::Context;
 use clap::{Parser, ValueEnum};
-#[cfg(unix)]
-use std::fs::metadata;
-#[cfg(unix)]
-use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
+
+#[cfg(unix)]
+mod ancestors_same_filesystem;
 
 #[derive(ValueEnum, Debug, PartialEq, Eq, Clone, Copy)]
 enum Mode {
@@ -40,16 +39,19 @@ fn is_project_root<P: AsRef<Path>>(dir: &P) -> bool {
     INDICATORS.iter().any(|i| p.join(i).exists())
 }
 
-#[cfg(unix)]
 #[inline(always)]
-fn get_device(p: &Path) -> anyhow::Result<u64> {
-    Ok(metadata(p)?.dev())
-}
-
-#[cfg(not(unix))]
-#[inline(always)]
-fn get_device(_p: &Path) -> anyhow::Result<u64> {
-    Ok(0)
+#[allow(unused_variables)]
+fn ancestors(
+    starting_directory: &Path,
+    span_file_systems: bool,
+) -> anyhow::Result<impl Iterator<Item = anyhow::Result<&Path>>> {
+    cfg_if::cfg_if! {
+        if #[cfg(unix)] {
+            ancestors_same_filesystem::Ancestors::new(starting_directory, starting_directory.ancestors(), span_file_systems)
+        } else {
+            Ok(starting_directory.ancestors().map(|i| Ok(i)))
+        }
+    }
 }
 
 fn find_project_root(
@@ -57,21 +59,10 @@ fn find_project_root(
     span_file_systems: bool,
     mode: Mode,
 ) -> anyhow::Result<Option<PathBuf>> {
-    let starting_device =
-        get_device(starting_directory).context("could not stat starting directory")?;
-
     let mut last_candidate: Option<PathBuf> = None;
 
-    for path in starting_directory.ancestors() {
-        if !span_file_systems
-            && get_device(path).context("could not stat ancestor")? != starting_device
-        {
-            if let Some(path) = last_candidate {
-                return Ok(Some(path));
-            } else {
-                anyhow::bail!("traversed filesystems without finding project root");
-            }
-        }
+    for path in ancestors(starting_directory, span_file_systems)? {
+        let path = path?;
         if is_project_root(&path) {
             if mode == Mode::Closest {
                 return Ok(Some(path.to_path_buf()));
