@@ -40,18 +40,19 @@ fn is_project_root<P: AsRef<Path>>(dir: &P) -> bool {
 }
 
 #[inline(always)]
-#[allow(unused_variables)]
 fn ancestors(
     starting_directory: &Path,
     span_file_systems: bool,
 ) -> anyhow::Result<impl Iterator<Item = anyhow::Result<&Path>>> {
-    cfg_if::cfg_if! {
-        if #[cfg(unix)] {
-            ancestors_same_filesystem::Ancestors::new(starting_directory, starting_directory.ancestors(), span_file_systems)
-        } else {
-            Ok(starting_directory.ancestors().map(|i| Ok(i)))
-        }
-    }
+    #[cfg(unix)]
+    let ancestors = ancestors_same_filesystem::Ancestors::new(
+        starting_directory,
+        starting_directory.ancestors(),
+        span_file_systems,
+    );
+    #[cfg(not(unix))]
+    let ancestors = Ok(starting_directory.ancestors().map(|i| Ok(i)));
+    ancestors
 }
 
 fn find_project_root(
@@ -107,7 +108,7 @@ fn main() -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{find_project_root, is_project_root, Mode};
+    use super::{Mode, find_project_root, is_project_root};
 
     #[test]
     fn test_is_project_root_git() -> anyhow::Result<()> {
